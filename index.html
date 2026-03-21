@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>10x10 Digit Recognizer</title>
+ 
+</head>
+<body>
+    <div class="bg-gradient-to-b from-[#3b8d99] to-[#aa4b6b] w-screen h-screen grid items-center justify-center
+    p-20">
+        <div class="h-full w-full items-center justify-center text-center">
+            <h2 class="text-6xl font-bold text-white">Draw a digit!</h2>
+            
+        </div>
+
+        <div class="flex justify-center mt-4">
+            <div id="grid" class="grid grid-cols-10 gap-1"></div>
+        </div>
+
+        <div class="flex justify-center items-center gap-2">
+            <button id="clear"  
+            class="px-6 py-2 bg-white/20 text-white border border-white rounded-lg 
+            hover:bg-white/30 transition">Clear</button>
+            <button id="predict"               
+            class="px-6 py-2 bg-black/40 text-white border border-white rounded-lg
+            hover:bg-black/50 transition">Predict</button>
+        </div>
+
+        <div class="flex justify-center items-center">
+            <h3 class="text-6xl font-bold text-white">Prediction:
+            <span id="prediction" class="font-mono text-white">-</span>
+            </h3>
+              <pre id="outputs" class="mt-4 p-4 bg-black/30 rounded-lg text-sm overflow-x-auto hidden"></pre>
+        </div>
+
+
+</div>
+
+
+
+<script>
+  const SIZE = 10;
+  const grid = document.getElementById("grid");
+  const predictionSpan = document.getElementById("prediction");
+  const outputsPre = document.getElementById("outputs");
+  const cells = [];
+
+  // Create 10x10 cells
+  for (let i = 0; i < SIZE * SIZE; i++) {
+    const cell = document.createElement("div");
+    cell.className = "w-10 h-10 bg-white rounded-xl border border-gray-500"
+    cell.dataset.index = i;
+
+    cell.addEventListener("click", () => {
+       if (cell.classList.contains("bg-black")) {
+          cell.classList.remove("bg-black");
+          cell.classList.add("bg-white");
+        } else {
+          cell.classList.remove("bg-white");
+          cell.classList.add("bg-black");
+        }
+    });
+
+    grid.appendChild(cell);
+    cells.push(cell);
+  }
+
+  document.getElementById("clear").addEventListener("click", () => {
+    cells.forEach(c => {
+        c.classList.remove("bg-black");
+        c.classList.add("bg-white");
+      });
+    predictionSpan.textContent = "-";
+    outputsPre.textContent = "";
+  });
+
+  document.getElementById("predict").addEventListener("click", async () => {
+    // map cell states to 0/1 pixels
+      const pixels = cells.map(c => c.classList.contains("bg-black") ? 1 : 0);
+
+    try {
+      const res = await fetch("/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pixels })
+      });
+
+      const data = await res.json();
+      if (data.error) {
+        predictionSpan.textContent = "Error";
+        outputsPre.textContent = data.error;
+        return;
+      }
+
+      predictionSpan.textContent = data.predicted_digit;
+      outputsPre.textContent =
+        "Outputs:\n" + JSON.stringify(data.outputs, null, 2);
+    } catch (err) {
+      predictionSpan.textContent = "Error";
+      outputsPre.textContent = String(err);
+    }
+  });
+</script>
+<script src="https://cdn.tailwindcss.com"></script>
+
+</body>
+</html>

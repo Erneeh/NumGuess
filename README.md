@@ -1,6 +1,6 @@
 # Digit Recognizer 🧠
 
-A handwritten digit recognizer built from scratch — no ML libraries.
+A  digit recognizer built from scratch — no ML libraries.
 Draw a digit on a 10×10 grid and a neural network predicts what it is.
 
 Built to understand how neural networks actually work under the hood,

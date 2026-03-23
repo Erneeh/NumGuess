@@ -10,28 +10,18 @@ def Sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 def SingleNeuron(X, W):
-    """
-    X: list of pixel values (length N)
-    W: list of weights (length N+1) -> [bias, w0, w1, ..., wN-1]
-    """
-    weightSum = W[0]  # bias
+    weightSum = W[0]
     for i in range(len(X)):
         weightSum += X[i] * W[i+1]
     return Sigmoid(weightSum)
 
 def SingleLayerNetwork(X, W):
-    """
-    X: input vector
-    W: list of neurons' weights (10 x (N+1))
-    """
     return [SingleNeuron(X, neuron_weights) for neuron_weights in W]
 
 def PredictDigit(X, W):
     outputs = SingleLayerNetwork(X, W)
     predicted = int(np.argmax(outputs))
     return outputs, predicted
-
-# --------- LOAD TRAINED WEIGHTS ---------
 
 def LoadWeights(path="TrainedWeights.txt"):
     W = []
@@ -46,18 +36,35 @@ def LoadWeights(path="TrainedWeights.txt"):
     print(f"Loaded {len(W)} neurons from {path}")
     return W
 
-# Load once when server starts
+def ReadTrainingSets(path):
+    result = {}       # { "0": [[...],[...]], "1": [...], ... }
+    current_digit = None
+    with open(path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            if line.isdigit():
+                current_digit = line
+                if current_digit not in result:
+                    result[current_digit] = []
+            elif line.startswith("[") and line.endswith("]") and current_digit is not None:
+                nums = [int(x) for x in line[1:-1].split(",")]
+                result[current_digit].append(nums)
+    return result
+
+# ── Load once on startup ──
 WEIGHTS_PATH = "TrainedWeights.txt"
+TRAINING_PATH = "Training.txt"
+
 if not os.path.exists(WEIGHTS_PATH):
-    raise FileNotFoundError(
-        f"{WEIGHTS_PATH} not found. Train in ANN.py and call SaveWeights(W) first."
-    )
+    raise FileNotFoundError(f"{WEIGHTS_PATH} not found. Run ANN.py first.")
 
 W = LoadWeights(WEIGHTS_PATH)
-INPUT_SIZE = len(W[0]) - 1  # N = weights - 1 bias
+INPUT_SIZE = len(W[0]) - 1
 print("Expected input size:", INPUT_SIZE)
 
-# --------- ROUTES ---------
+# ── Routes ──
 
 @app.route("/")
 def index():
@@ -67,34 +74,22 @@ def index():
 def predict():
     data = request.get_json()
     if data is None or "pixels" not in data:
-        return jsonify({"error": "Missing 'pixels' field in JSON"}), 400
+        return jsonify({"error": "Missing 'pixels' field"}), 400
 
     pixels = data["pixels"]
-
-    if not isinstance(pixels, list):
-        return jsonify({"error": "'pixels' must be a list"}), 400
-
     if len(pixels) != INPUT_SIZE:
-        return jsonify({
-            "error": f"Expected {INPUT_SIZE} pixels, got {len(pixels)}"
-        }), 400
+        return jsonify({"error": f"Expected {INPUT_SIZE} pixels, got {len(pixels)}"}), 400
 
-    # convert to float
     X = [float(v) for v in pixels]
-
     outputs, predicted = PredictDigit(X, W)
+    return jsonify({"outputs": outputs, "predicted_digit": predicted})
 
-    return jsonify({
-        "outputs": outputs,
-        "predicted_digit": predicted
-    })
+@app.route("/training-data", methods=["GET"])
+def get_training_data():
+    if not os.path.exists(TRAINING_PATH):
+        return jsonify({}), 200
+    data = ReadTrainingSets(TRAINING_PATH)
+    return jsonify(data)
 
 if __name__ == "__main__":
     app.run(debug=True)
-
-
-# PASIJUNGT ->
-#pip install flask
-#pip install numpy flask
-#python app.py
-

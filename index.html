@@ -2,106 +2,351 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>10x10 Digit Recognizer</title>
- 
+  <title>Digit Recognizer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'DM Sans', sans-serif; }
+    .mono { font-family: 'Space Mono', monospace; }
+
+    .cell {
+      width: 100%;
+      aspect-ratio: 1;
+      background: #1a1a2e;
+      border: 1px solid #2a2a4a;
+      border-radius: 2px;
+      cursor: crosshair;
+      transition: background 0.05s;
+    }
+    .cell.filled { background: #e0e0ff; }
+
+    #modal {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      z-index: 50;
+      align-items: center;
+      justify-content: center;
+    }
+    #modal.open { display: flex; }
+    #modal-box {
+      background: #0f0f1e;
+      border: 1px solid #3a3a6a;
+      border-radius: 16px;
+      padding: 2rem;
+      width: 520px;
+      max-width: 95vw;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .digit-btn {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      border: 1px solid #3a3a6a;
+      background: #1a1a2e;
+      color: #a0a0c0;
+      font-family: 'Space Mono', monospace;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .digit-btn:hover { border-color: #7070ff; color: #fff; }
+    .digit-btn.active { background: #3030a0; border-color: #7070ff; color: #fff; }
+
+    .variant-card {
+      border: 1px solid #2a2a4a;
+      border-radius: 10px;
+      padding: 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+      background: #14142a;
+    }
+    .variant-card:hover { border-color: #7070ff; background: #1e1e40; }
+    .variant-grid {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 1px;
+    }
+    .variant-cell {
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: 1px;
+    }
+
+    #confirm-dialog {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.8);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    #confirm-dialog.open { display: flex; }
+    #confirm-box {
+      background: #0f0f1e;
+      border: 1px solid #5050c0;
+      border-radius: 12px;
+      padding: 1.5rem 2rem;
+      text-align: center;
+      max-width: 320px;
+    }
+
+    .bar-bg {
+      height: 6px;
+      background: #1a1a3a;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4040c0, #8080ff);
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+  </style>
 </head>
-<body>
-    <div class="bg-gradient-to-b from-[#3b8d99] to-[#aa4b6b] w-screen h-screen grid items-center justify-center
-    p-20">
-        <div class="h-full w-full items-center justify-center text-center">
-            <h2 class="text-6xl font-bold text-white">Draw a digit!</h2>
-            
-        </div>
+<body class="bg-[#080818] min-h-screen text-white flex flex-col items-center justify-center p-6 gap-6">
 
-        <div class="flex justify-center mt-4">
-            <div id="grid" class="grid grid-cols-10 gap-1"></div>
-        </div>
+  <div class="text-center">
+    <h1 class="mono text-3xl font-bold text-white tracking-tight">digit<span class="text-[#6060ff]">.</span>ai</h1>
+    <p class="text-[#6060a0] text-sm mt-1">draw a digit, let the network guess</p>
+  </div>
 
-        <div class="flex justify-center items-center gap-2">
-            <button id="clear"  
-            class="px-6 py-2 bg-white/20 text-white border border-white rounded-lg 
-            hover:bg-white/30 transition">Clear</button>
-            <button id="predict"               
-            class="px-6 py-2 bg-black/40 text-white border border-white rounded-lg
-            hover:bg-black/50 transition">Predict</button>
-        </div>
+  <div class="flex gap-8 items-start">
+    <div>
+      <div id="grid" class="grid gap-[2px] select-none"
+           style="grid-template-columns: repeat(10, 28px); width: fit-content;">
+      </div>
+    </div>
 
-        <div class="flex justify-center items-center">
-            <h3 class="text-6xl font-bold text-white">Prediction:
-            <span id="prediction" class="font-mono text-white">-</span>
-            </h3>
-              <pre id="outputs" class="mt-4 p-4 bg-black/30 rounded-lg text-sm overflow-x-auto hidden"></pre>
-        </div>
+    <div class="flex flex-col gap-3 w-40">
+      <button id="predict-btn"
+        class="mono text-sm px-4 py-2 bg-[#3030a0] hover:bg-[#4040c0] rounded-lg transition border border-[#5050d0]">
+        predict
+      </button>
+      <button id="clear-btn"
+        class="mono text-sm px-4 py-2 bg-[#1a1a2e] hover:bg-[#252540] rounded-lg transition border border-[#3a3a6a]">
+        clear
+      </button>
+      <button id="view-training-btn"
+        class="mono text-sm px-4 py-2 bg-[#1a1a2e] hover:bg-[#252540] rounded-lg transition border border-[#3a3a6a] text-[#a0a0ff]">
+        training data
+      </button>
 
+      <div class="mt-4 text-center">
+        <p class="text-[#6060a0] text-xs mono mb-1">prediction</p>
+        <p id="prediction" class="mono text-5xl font-bold text-white">—</p>
+      </div>
+    </div>
+  </div>
 
-</div>
+  <div id="bars-panel" class="hidden w-full max-w-xs">
+    <p class="mono text-xs text-[#6060a0] mb-2">confidence</p>
+    <div id="bars" class="flex flex-col gap-2"></div>
+  </div>
 
+  <!-- TRAINING DATA MODAL -->
+  <div id="modal">
+    <div id="modal-box">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="mono text-lg font-bold text-white">training data</h2>
+        <button id="modal-close" class="text-[#6060a0] hover:text-white text-xl leading-none">✕</button>
+      </div>
+      <p class="text-xs text-[#6060a0] mb-2">select digit</p>
+      <div class="flex gap-2 flex-wrap mb-5" id="digit-selector"></div>
+      <p class="text-xs text-[#6060a0] mb-2">variants <span id="variant-count" class="text-[#4040a0]"></span></p>
+      <div id="variants-container" class="flex flex-wrap gap-3">
+        <p class="text-[#4040a0] text-sm mono">select a digit above</p>
+      </div>
+    </div>
+  </div>
 
+  <!-- CONFIRM DIALOG -->
+  <div id="confirm-dialog">
+    <div id="confirm-box">
+      <p class="text-white mono text-sm mb-1">load this variant?</p>
+      <p class="text-[#6060a0] text-xs mb-4">this will replace your current drawing</p>
+      <div class="flex gap-3 justify-center">
+        <button id="confirm-yes"
+          class="mono text-sm px-5 py-2 bg-[#3030a0] hover:bg-[#4040c0] rounded-lg border border-[#5050d0] transition">
+          load
+        </button>
+        <button id="confirm-no"
+          class="mono text-sm px-5 py-2 bg-[#1a1a2e] hover:bg-[#252540] rounded-lg border border-[#3a3a6a] transition">
+          cancel
+        </button>
+      </div>
+    </div>
+  </div>
 
 <script>
   const SIZE = 10;
-  const grid = document.getElementById("grid");
-  const predictionSpan = document.getElementById("prediction");
-  const outputsPre = document.getElementById("outputs");
+  const gridEl = document.getElementById("grid");
   const cells = [];
+  let isDrawing = false;
+  let pendingVariant = null;
+  let trainingData = {};
+  let selectedDigit = null;
 
-  // Create 10x10 cells
   for (let i = 0; i < SIZE * SIZE; i++) {
     const cell = document.createElement("div");
-    cell.className = "w-10 h-10 bg-white rounded-xl border border-gray-500"
-    cell.dataset.index = i;
-
-    cell.addEventListener("click", () => {
-       if (cell.classList.contains("bg-black")) {
-          cell.classList.remove("bg-black");
-          cell.classList.add("bg-white");
-        } else {
-          cell.classList.remove("bg-white");
-          cell.classList.add("bg-black");
-        }
-    });
-
-    grid.appendChild(cell);
+    cell.className = "cell";
+    gridEl.appendChild(cell);
     cells.push(cell);
   }
 
-  document.getElementById("clear").addEventListener("click", () => {
-    cells.forEach(c => {
-        c.classList.remove("bg-black");
-        c.classList.add("bg-white");
-      });
-    predictionSpan.textContent = "-";
-    outputsPre.textContent = "";
+  gridEl.addEventListener("mousedown", () => { isDrawing = true; });
+  window.addEventListener("mouseup", () => { isDrawing = false; });
+  gridEl.addEventListener("dragstart", e => e.preventDefault());
+
+  cells.forEach(cell => {
+    cell.addEventListener("mousedown", () => {
+      cell.classList.toggle("filled");
+    });
+    cell.addEventListener("mouseover", () => {
+      if (isDrawing) cell.classList.add("filled");
+    });
   });
 
-  document.getElementById("predict").addEventListener("click", async () => {
-    // map cell states to 0/1 pixels
-      const pixels = cells.map(c => c.classList.contains("bg-black") ? 1 : 0);
+  document.getElementById("clear-btn").addEventListener("click", () => {
+    cells.forEach(c => c.classList.remove("filled"));
+    document.getElementById("prediction").textContent = "—";
+    document.getElementById("bars-panel").classList.add("hidden");
+  });
 
+  document.getElementById("predict-btn").addEventListener("click", async () => {
+    const pixels = cells.map(c => c.classList.contains("filled") ? 1 : 0);
     try {
       const res = await fetch("/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pixels })
       });
-
       const data = await res.json();
-      if (data.error) {
-        predictionSpan.textContent = "Error";
-        outputsPre.textContent = data.error;
-        return;
-      }
-
-      predictionSpan.textContent = data.predicted_digit;
-      outputsPre.textContent =
-        "Outputs:\n" + JSON.stringify(data.outputs, null, 2);
+      if (data.error) { document.getElementById("prediction").textContent = "!"; return; }
+      document.getElementById("prediction").textContent = data.predicted_digit;
+      renderBars(data.outputs);
     } catch (err) {
-      predictionSpan.textContent = "Error";
-      outputsPre.textContent = String(err);
+      document.getElementById("prediction").textContent = "!";
     }
   });
-</script>
-<script src="https://cdn.tailwindcss.com"></script>
 
+  function renderBars(outputs) {
+    const panel = document.getElementById("bars-panel");
+    const barsEl = document.getElementById("bars");
+    barsEl.innerHTML = "";
+    panel.classList.remove("hidden");
+    outputs.forEach((val, i) => {
+      const pct = Math.round(val * 100);
+      const row = document.createElement("div");
+      row.className = "flex items-center gap-2";
+      row.innerHTML = `
+        <span class="mono text-xs text-[#6060a0] w-3">${i}</span>
+        <div class="bar-bg flex-1"><div class="bar-fill" style="width:${pct}%"></div></div>
+        <span class="mono text-xs text-[#8080c0] w-8 text-right">${pct}%</span>
+      `;
+      barsEl.appendChild(row);
+    });
+  }
+
+  const modal = document.getElementById("modal");
+  const digitSelector = document.getElementById("digit-selector");
+
+  document.getElementById("view-training-btn").addEventListener("click", async () => {
+    if (Object.keys(trainingData).length === 0) {
+      try {
+        const res = await fetch("/training-data");
+        trainingData = await res.json();
+      } catch (e) {
+        alert("Could not load training data.");
+        return;
+      }
+    }
+    digitSelector.innerHTML = "";
+    for (let d = 0; d <= 9; d++) {
+      const btn = document.createElement("button");
+      btn.className = "digit-btn" + (selectedDigit === d ? " active" : "");
+      btn.textContent = d;
+      btn.addEventListener("click", () => {
+        selectedDigit = d;
+        document.querySelectorAll(".digit-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        renderVariants(d);
+      });
+      digitSelector.appendChild(btn);
+    }
+    if (selectedDigit !== null) renderVariants(selectedDigit);
+    modal.classList.add("open");
+  });
+
+  document.getElementById("modal-close").addEventListener("click", () => {
+    modal.classList.remove("open");
+  });
+  modal.addEventListener("click", e => {
+    if (e.target === modal) modal.classList.remove("open");
+  });
+
+  function renderVariants(digit) {
+    const container = document.getElementById("variants-container");
+    const countEl = document.getElementById("variant-count");
+    const variants = trainingData[String(digit)] || [];
+    countEl.textContent = `(${variants.length})`;
+    container.innerHTML = "";
+
+    if (variants.length === 0) {
+      container.innerHTML = `<p class="text-[#4040a0] text-sm mono">no data for digit ${digit}</p>`;
+      return;
+    }
+
+    variants.forEach((pixels, idx) => {
+      const card = document.createElement("div");
+      card.className = "variant-card";
+
+      const label = document.createElement("p");
+      label.className = "mono text-xs text-[#6060a0] mb-1 text-center";
+      label.textContent = `variant ${idx + 1}`;
+
+      const miniGrid = document.createElement("div");
+      miniGrid.className = "variant-grid";
+      miniGrid.style.width = "80px";
+
+      pixels.forEach(val => {
+        const c = document.createElement("div");
+        c.className = "variant-cell";
+        c.style.background = val ? "#e0e0ff" : "#1a1a2e";
+        miniGrid.appendChild(c);
+      });
+
+      card.appendChild(label);
+      card.appendChild(miniGrid);
+
+      card.addEventListener("click", () => {
+        pendingVariant = pixels;
+        document.getElementById("confirm-dialog").classList.add("open");
+      });
+
+      container.appendChild(card);
+    });
+  }
+
+  document.getElementById("confirm-yes").addEventListener("click", () => {
+    if (pendingVariant) {
+      pendingVariant.forEach((val, i) => {
+        if (val) cells[i].classList.add("filled");
+        else cells[i].classList.remove("filled");
+      });
+      pendingVariant = null;
+    }
+    document.getElementById("confirm-dialog").classList.remove("open");
+    modal.classList.remove("open");
+  });
+
+  document.getElementById("confirm-no").addEventListener("click", () => {
+    pendingVariant = null;
+    document.getElementById("confirm-dialog").classList.remove("open");
+  });
+</script>
 </body>
 </html>

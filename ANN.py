@@ -110,7 +110,8 @@ def SaveWeights(W, path="TrainedWeights.txt"):
     with open(path, "w") as f:
         f.write("Output layer weights:\n")
         for neuron in W:
-            f.write(str(neuron) + "\n")   # writes list like [0.12, -0.44, ...]
+            plain = [float(w) for w in neuron]
+            f.write(str(plain) + "\n")   # writes list like [0.12, -0.44, ...]
     print(f"Weights saved to {path}")
 
 def LoadWeights(path="TrainedWeights.txt"):
